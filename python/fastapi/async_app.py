@@ -1,37 +1,37 @@
 import logging
 from typing import Optional
 
+import asyncpg
 import numpy as np
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import UJSONResponse
-from psycopg2.pool import ThreadedConnectionPool
 from scipy import signal
 
 logging.disable()
 
 query_by_name = '''select student_id, student_name, student_gender, student_birthday 
-from test.sc_student where student_name = %s'''
+from test.sc_student where student_name = $1'''
 
 query_all = 'select student_id, student_name, student_gender, student_birthday from test.sc_student'
 
 
-def get_connection_pool():
+async def get_connection_pool():
     global app
-    app.state.connection_pool = ThreadedConnectionPool(
-        minconn=16,
-        maxconn=16,
-        database='test',
+    app.state.connection_pool = await asyncpg.create_pool(
+        min_size=16,
+        max_size=16,
         user='postgres',
         password='123456',
+        database='test',
         host='127.0.0.1',
-        port=5432,
+        port=5432
     )
 
 
-def close_connection_pool():
+async def close_connection_pool():
     global app
-    app.state.connection_pool.closeall()
+    await app.state.connection_pool.close()
 
 
 app = FastAPI()
@@ -40,39 +40,28 @@ app.add_event_handler('shutdown', close_connection_pool)
 
 
 @app.get('/hello')
-def hello(name: Optional[str] = None):
+async def async_hello(name: Optional[str] = None):
     return {'message': f'Hello {name or "World"}!'}
 
 
 @app.get('/hello_ujson')
-def hello_ujson(name: Optional[str] = None):
+async def async_hello_ujson(name: Optional[str] = None):
     return UJSONResponse({'message': f'Hello {name or "World"}!'})
 
 
 @app.get('/db')
-def db(name: Optional[str] = None):
+async def async_db(name: Optional[str] = None):
     pool = app.state.connection_pool
-    conn = pool.getconn()
-    cur = conn.cursor()
-    if name:
-        cur.execute(query_by_name, (name,))
-    else:
-        cur.execute(query_all)
-    items = cur.fetchall()
-    pool.putconn(conn)
-    result = []
-    for item in items:
-        result.append({
-            'student_id': item[0],
-            'student_name': item[1],
-            'student_gender': item[2],
-            'student_birthday': item[3],
-        })
-    return result
+    async with pool.acquire() as conn:
+        if name:
+            items = await conn.fetch(query_by_name, name)
+        else:
+            items = await conn.fetch(query_all)
+    return [dict(item) for item in items]
 
 
 @app.get('/numpy')
-def numpy():
+async def async_numpy():
     arr = np.random.random([1000, 1000])
     core = np.random.random([18, 18])
     conv = signal.convolve2d(arr, core)

@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from json import dumps as json_dumps
 from typing import Optional
@@ -11,8 +12,6 @@ from falcon.response import Response
 from scipy import signal
 from ujson import dumps as ujson_dumps
 
-import logging
-
 logging.disable()
 
 query_by_name = '''select student_id, student_name, student_gender, student_birthday 
@@ -20,21 +19,26 @@ from test.sc_student where student_name = $1'''
 
 query_all = 'select student_id, student_name, student_gender, student_birthday from test.sc_student'
 
+async_connection_pool: Optional[asyncpg.pool.Pool] = None
 
-async def async_connection_pool():
-    global _async_connection_pool
-    if not _async_connection_pool:
-        _async_connection_pool = await asyncpg.create_pool(
+
+class DatabaseMiddleware:
+
+    async def process_startup(self, scope, event):
+        global async_connection_pool
+        async_connection_pool = await asyncpg.create_pool(
+            min_size=16,
+            max_size=16,
             user='postgres',
             password='123456',
             database='test',
             host='127.0.0.1',
             port=5432
         )
-    return _async_connection_pool
 
-
-_async_connection_pool: Optional[asyncpg.pool.Pool] = None
+    async def process_shutdown(self, scope, event):
+        global async_connection_pool
+        await async_connection_pool.close()
 
 
 class HelloResource:
@@ -55,7 +59,8 @@ class DatabaseResource:
 
     async def on_get(self, req: Request, resp: Response):
         name = req.params.get('name')
-        async with (await async_connection_pool()).acquire() as conn:
+        global async_connection_pool
+        async with async_connection_pool.acquire() as conn:
             if name:
                 items = await conn.fetch(query_by_name, name)
             else:
@@ -79,10 +84,13 @@ class NumpyResource:
 
 
 app = falcon.asgi.App()
-app.add_route('/async/hello', HelloResource())
-app.add_route('/async/hello_ujson', HelloUJsonResource())
-app.add_route('/async/db', DatabaseResource())
-app.add_route('/async/numpy', NumpyResource())
+
+app.add_middleware(DatabaseMiddleware())
+
+app.add_route('/hello', HelloResource())
+app.add_route('/hello_ujson', HelloUJsonResource())
+app.add_route('/db', DatabaseResource())
+app.add_route('/numpy', NumpyResource())
 
 if __name__ == '__main__':
-    uvicorn.run(app=app, port=8081)
+    uvicorn.run(app=app, port=8080)
