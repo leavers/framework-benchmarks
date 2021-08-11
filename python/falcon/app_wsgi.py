@@ -65,6 +65,7 @@ class DatabaseResource:
         else:
             cur.execute(query_all)
         items = cur.fetchall()
+        connection_pool.putconn(conn)
         result = []
         for item in items:
             result.append({
