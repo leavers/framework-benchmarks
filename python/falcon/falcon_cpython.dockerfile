@@ -1,3 +1,5 @@
+# docker build . -f falcon_cpython.dockerfile -t falcon_cpython:latest
+
 FROM python:3.9
 
 WORKDIR /usr/src/app

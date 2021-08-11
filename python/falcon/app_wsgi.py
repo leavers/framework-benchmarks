@@ -1,4 +1,5 @@
-import os
+import atexit
+import logging
 from json import dumps as json_dumps
 from wsgiref.simple_server import make_server
 
@@ -10,8 +11,6 @@ from psycopg2.pool import ThreadedConnectionPool
 from scipy import signal
 from ujson import dumps as ujson_dumps
 
-import logging
-
 logging.disable()
 
 query_by_name = '''select student_id, student_name, student_gender, student_birthday 
@@ -19,23 +18,21 @@ from test.sc_student where student_name = %s'''
 
 query_all = 'select student_id, student_name, student_gender, student_birthday from test.sc_student'
 
-
-def connection_pool():
-    global _connection_pool
-    if not _connection_pool:
-        _connection_pool = ThreadedConnectionPool(
-            minconn=os.cpu_count(),
-            maxconn=128,
-            database='test',
-            user='postgres',
-            password='123456',
-            host='127.0.0.1',
-            port=5432,
-        )
-    return _connection_pool
+connection_pool = ThreadedConnectionPool(
+    minconn=16,
+    maxconn=16,
+    database='test',
+    user='postgres',
+    password='123456',
+    host='127.0.0.1',
+    port=5432,
+)
 
 
-_connection_pool = None
+@atexit.register
+def close_connection_pool():
+    global connection_pool
+    connection_pool.closeall()
 
 
 class HelloResource:
@@ -60,8 +57,8 @@ class DatabaseResource:
 
     def on_get(self, req: Request, resp: Response):
         name = req.params.get('name')
-        pool = connection_pool()
-        conn = pool.getconn()
+        global connection_pool
+        conn = connection_pool.getconn()
         cur = conn.cursor()
         if name:
             cur.execute(query_by_name, (name,))
