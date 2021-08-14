@@ -1,4 +1,4 @@
-# docker build . -f bottle_cpython_meinheld.dockerfile -t falcon_cpython_meinheld:latest
+# docker build . -f bottle_cpython_meinheld.dockerfile -t bottle_cpython_meinheld:latest
 
 FROM python:3.9
 
