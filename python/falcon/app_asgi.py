@@ -44,14 +44,14 @@ class DatabaseMiddleware:
 class HelloResource:
 
     async def on_get(self, req: Request, resp: Response):
-        name = req.params.get('name') or 'World'
+        name = req.params.get('name', 'World')
         resp.text = json_dumps({'message': f'Hello {name}!'})
 
 
 class HelloUJsonResource:
 
     async def on_get(self, req: Request, resp: Response):
-        name = req.params.get('name') or 'World'
+        name = req.params.get('name', 'World')
         resp.text = ujson_dumps({'message': f'Hello {name}!'})
 
 

@@ -38,7 +38,7 @@ def close_connection_pool():
 class HelloResource:
 
     def on_get(self, req: Request, resp: Response):
-        name = req.params.get('name') or 'World'
+        name = req.params.get('name', 'World')
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         resp.text = json_dumps({'message': f'Hello {name}!'})
@@ -47,7 +47,7 @@ class HelloResource:
 class HelloUJsonResource:
 
     def on_get(self, req: Request, resp: Response):
-        name = req.params.get('name') or 'World'
+        name = req.params.get('name', 'World')
         resp.status = falcon.HTTP_200
         resp.content_type = falcon.MEDIA_JSON
         resp.text = ujson_dumps({'message': f'Hello {name}!'})

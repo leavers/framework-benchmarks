@@ -1,11 +1,10 @@
 import atexit
+
+import numpy as np
 from flask import Flask, request, Response
 from flask.json import jsonify
-
 from psycopg2.pool import ThreadedConnectionPool
-import numpy as np
 from scipy import signal
-from json import dumps as json_dumps
 from ujson import dumps as ujson_dumps
 
 query_by_name = '''select student_id, student_name, student_gender, student_birthday 
