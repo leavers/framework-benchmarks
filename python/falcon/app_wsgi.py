@@ -3,13 +3,17 @@ import logging
 from json import dumps as json_dumps
 from wsgiref.simple_server import make_server
 
+import sys
 import falcon
-import numpy as np
 from falcon.request import Request
 from falcon.response import Response
-from psycopg2.pool import ThreadedConnectionPool
-from scipy import signal
 from ujson import dumps as ujson_dumps
+
+_is_pypy = hasattr(sys, 'pypy_version_info')
+if _is_pypy:
+    from psycopg2cffi.pool import ThreadedConnectionPool
+else:
+    from psycopg2.pool import ThreadedConnectionPool
 
 logging.disable()
 
@@ -77,24 +81,31 @@ class DatabaseResource:
         resp.text = json_dumps(result)
 
 
-class NumpyResource:
-
-    def on_get(self, _: Request, resp: Response):
-        arr = np.random.random([1000, 1000])
-        core = np.random.random([18, 18])
-        conv = signal.convolve2d(arr, core)
-        l1 = conv.mean(axis=0).tolist()
-        l2 = conv.mean(axis=1).tolist()
-        resp.text = json_dumps({'l1': l1, 'l2': l2})
-
-
 app = falcon.App()
 app.add_route('/hello', HelloResource())
 app.add_route('/hello_ujson', HelloUJsonResource())
 app.add_route('/db', DatabaseResource())
-app.add_route('/numpy', NumpyResource())
+
+if not _is_pypy:
+    import numpy as np
+    from scipy import signal
+
+
+    class NumpyResource:
+
+        def on_get(self, _: Request, resp: Response):
+            arr = np.random.random([1000, 1000])
+            core = np.random.random([18, 18])
+            conv = signal.convolve2d(arr, core)
+            l1 = conv.mean(axis=0).tolist()
+            l2 = conv.mean(axis=1).tolist()
+            resp.text = json_dumps({'l1': l1, 'l2': l2})
+
+
+    app.add_route('/numpy', NumpyResource())
 
 if __name__ == '__main__':
-    with make_server('', 8080, app) as httpd:
-        print('Serving on port 8080...')
+    port = 8080
+    with make_server('', port, app) as httpd:
+        print(f'Serving on port {port}...')
         httpd.serve_forever()
